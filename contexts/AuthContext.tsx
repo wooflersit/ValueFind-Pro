@@ -1,111 +1,126 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase/client';
-import { User, UserRole } from '../utils/supabase/types';
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { createClient } from '../utils/supabase/client';
 import { apiCall } from '../utils/api';
+
+interface UserRole {
+  role: string;
+  status: 'active' | 'inactive';
+  kycStatus: 'not_started' | 'pending' | 'under_review' | 'verified' | 'rejected';
+  metadata?: any;
+  createdAt: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  phone: string;
+  name: string;
+  roles: Record<string, UserRole>;
+  primaryRole: string;
+  currentRole: string; // Active role for current session
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
+  login: (email: string, password: string, role?: string) => Promise<void>;
+  logout: () => void;
+  switchRole: (newRole: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  const fetchUserData = async (userId: string, accessToken: string) => {
+  const fetchUserData = async (userId: string) => {
     const response = await apiCall<User>('/auth/user', {
       method: 'POST',
       body: JSON.stringify({ userId }),
     });
-
     if (response.success && response.data) {
-      setUser(response.data);
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('user_id', userId);
+      const userData = response.data;
+      // Set current role to primary role if not set
+      if (!userData.currentRole) {
+        userData.currentRole = userData.primaryRole;
+      }
+      setUser(userData);
     }
   };
 
-  const checkSession = async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (session && session.user) {
-        await fetchUserData(session.user.id, session.access_token);
-      } else {
-        setUser(null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user_id');
-      }
-    } catch (error) {
-      console.error('Session check error:', error);
-      setUser(null);
-    } finally {
-      setLoading(false);
+  const refreshUser = async () => {
+    if (user) {
+      await fetchUserData(user.id);
     }
   };
 
   useEffect(() => {
-    checkSession();
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await fetchUserData(session.user.id);
+      }
+      setLoading(false);
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session && session.user) {
-        await fetchUserData(session.user.id, session.access_token);
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        await fetchUserData(session.user.id);
       } else {
         setUser(null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user_id');
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
+  const login = async (email: string, password: string, role?: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) {
+      await fetchUserData(data.user.id);
+      // If specific role requested, switch to it
+      if (role && user && user.roles[role]) {
+        await switchRole(role);
       }
-
-      if (data.session && data.user) {
-        await fetchUserData(data.user.id, data.session.access_token);
-        return { success: true };
-      }
-
-      return { success: false, error: 'Login failed' };
-    } catch (error: any) {
-      return { success: false, error: error.message };
     }
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_id');
   };
 
-  const refreshUser = async () => {
-    const userId = localStorage.getItem('user_id');
-    const accessToken = localStorage.getItem('access_token');
-    if (userId && accessToken) {
-      await fetchUserData(userId, accessToken);
+  const switchRole = async (newRole: string) => {
+    if (!user) return;
+    
+    // Validate role exists
+    if (!user.roles[newRole]) {
+      throw new Error('Invalid role');
+    }
+
+    // Update current role in backend
+    const response = await apiCall('/auth/switch-role', {
+      method: 'POST',
+      body: JSON.stringify({ userId: user.id, newRole }),
+    });
+
+    if (response.success) {
+      setUser({ ...user, currentRole: newRole });
+      // Refresh to get updated data
+      await fetchUserData(user.id);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, switchRole, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -113,8 +128,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
