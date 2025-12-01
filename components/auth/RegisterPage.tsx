@@ -5,12 +5,25 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { PublicHeader } from '../shared/PublicHeader';
+import { AddressAutocomplete } from '../shared/AddressAutocomplete';
 import { apiCall } from '../../utils/api';
 import { useNotification } from '../../contexts/NotificationContext';
 import { Alert, AlertDescription } from '../ui/alert';
-import { CheckCircle, XCircle, AlertCircle, Loader2, Phone, Mail, User, Lock, MapPin, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Loader2, Phone, Mail, User, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
 
 type RegistrationStep = 'details' | 'address' | 'otp' | 'complete';
+
+interface AddressData {
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  landmark?: string;
+  lat?: number;
+  lng?: number;
+  formattedAddress?: string;
+}
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -24,12 +37,13 @@ export const RegisterPage: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    addressLine1: '',
-    addressLine2: '',
+  });
+
+  const [address, setAddress] = useState<AddressData>({
+    line1: '',
     city: '',
     state: '',
     pincode: '',
-    landmark: '',
   });
 
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
@@ -92,11 +106,11 @@ export const RegisterPage: React.FC = () => {
 
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.addressLine1) newErrors.addressLine1 = 'Address is required';
-    if (!formData.city) newErrors.city = 'City is required';
-    if (!formData.state) newErrors.state = 'State is required';
-    if (!formData.pincode) newErrors.pincode = 'Pincode is required';
-    if (formData.pincode.length !== 6) newErrors.pincode = 'Pincode must be 6 digits';
+    if (!address.line1) newErrors.addressLine1 = 'Address is required';
+    if (!address.city) newErrors.city = 'City is required';
+    if (!address.state) newErrors.state = 'State is required';
+    if (!address.pincode) newErrors.pincode = 'Pincode is required';
+    if (address.pincode.length !== 6) newErrors.pincode = 'Pincode must be 6 digits';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -152,7 +166,7 @@ export const RegisterPage: React.FC = () => {
         phone: formData.phone,
         password: formData.password,
         role: 'customer',
-        address: { line1: formData.addressLine1, line2: formData.addressLine2, city: formData.city, state: formData.state, pincode: formData.pincode, landmark: formData.landmark },
+        address: address,
       }),
     }, false);
     setLoading(false);
@@ -174,12 +188,28 @@ export const RegisterPage: React.FC = () => {
               <CardTitle className="text-2xl text-center">Create Your Account</CardTitle>
               <CardDescription className="text-center">
                 {step === 'details' && 'Enter your personal details'}
-                {step === 'address' && 'Add your delivery address'}
+                {step === 'address' && 'Add your delivery address with Maps'}
                 {step === 'otp' && 'Verify your phone number'}
                 {step === 'complete' && 'Registration successful!'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Progress Indicator */}
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'details' ? 'bg-blue-600 text-white' : 'bg-green-500 text-white'}`}>
+                  {step === 'details' ? '1' : <CheckCircle className="h-5 w-5" />}
+                </div>
+                <div className={`w-12 h-1 ${step !== 'details' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'address' ? 'bg-blue-600 text-white' : step === 'details' ? 'bg-gray-300 text-gray-600' : 'bg-green-500 text-white'}`}>
+                  {['details'].includes(step) ? '2' : step === 'address' ? '2' : <CheckCircle className="h-5 w-5" />}
+                </div>
+                <div className={`w-12 h-1 ${['otp', 'complete'].includes(step) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'otp' ? 'bg-blue-600 text-white' : step === 'complete' ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                  {step === 'complete' ? <CheckCircle className="h-5 w-5" /> : '3'}
+                </div>
+              </div>
+
+              {/* Step 1: Personal Details */}
               {step === 'details' && (
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -237,46 +267,33 @@ export const RegisterPage: React.FC = () => {
                   </Button>
                 </div>
               )}
+
+              {/* Step 2: Address with Maps */}
               {step === 'address' && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="addressLine1">Address Line 1 *</Label>
-                    <Input id="addressLine1" placeholder="123 Main Street" value={formData.addressLine1} onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })} />
-                    {errors.addressLine1 && <p className="text-xs text-red-600">{errors.addressLine1}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="addressLine2">Address Line 2</Label>
-                    <Input id="addressLine2" placeholder="Apartment, suite, etc. (optional)" value={formData.addressLine2} onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City *</Label>
-                      <Input id="city" placeholder="Bangalore" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} />
-                      {errors.city && <p className="text-xs text-red-600">{errors.city}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State *</Label>
-                      <Input id="state" placeholder="Karnataka" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} />
-                      {errors.state && <p className="text-xs text-red-600">{errors.state}</p>}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="pincode">Pincode *</Label>
-                      <Input id="pincode" placeholder="560001" maxLength={6} value={formData.pincode} onChange={(e) => setFormData({ ...formData, pincode: e.target.value })} />
-                      {errors.pincode && <p className="text-xs text-red-600">{errors.pincode}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="landmark">Landmark</Label>
-                      <Input id="landmark" placeholder="Near Park" value={formData.landmark} onChange={(e) => setFormData({ ...formData, landmark: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      <strong>Enhanced with Maps:</strong> Start typing to get address suggestions, or use your current location!
+                    </AlertDescription>
+                  </Alert>
+                  <AddressAutocomplete
+                    value={address}
+                    onChange={setAddress}
+                    label="Delivery Address"
+                    required={true}
+                    showMap={true}
+                    validateServiceArea={true}
+                    serviceAreaPincodes={['560001', '560002', '560003', '400001', '400002']}
+                  />
+                  <div className="flex gap-3 mt-6">
                     <Button onClick={handlePreviousStep} variant="outline" className="flex-1"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
                     <Button onClick={handleNextStep} className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600" disabled={loading}>Continue <ArrowRight className="ml-2 h-4 w-4" /></Button>
                   </div>
                 </div>
               )}
+
+              {/* Step 3: OTP Verification */}
               {step === 'otp' && (
                 <div className="space-y-4">
                   <p className="text-center text-gray-600">We've sent a 6-digit code to your {otpSentTo === 'phone' ? 'phone number' : 'email'}</p>
@@ -300,16 +317,19 @@ export const RegisterPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Step 4: Complete */}
               {step === 'complete' && (
                 <div className="text-center space-y-4 py-8">
                   <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
                     <CheckCircle className="h-10 w-10 text-green-600" />
                   </div>
                   <h3 className="text-2xl">Registration Successful!</h3>
-                  <p className="text-gray-600">Your account has been created. You can now log in.</p>
+                  <p className="text-gray-600">Your account has been created with verified address.</p>
                   <Button onClick={() => navigate('/login')} className="bg-gradient-to-r from-blue-600 to-purple-600">Go to Login</Button>
                 </div>
               )}
+
               <div className="text-center text-sm text-gray-600 mt-6">
                 Already have an account? <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign In</Link>
               </div>
