@@ -1,164 +1,145 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
-import { 
-  Menu, X, LogOut, Bell, User, ShoppingBag,
-  LayoutDashboard, Users, MapPin, Settings, Package,
-  ShoppingCart, FileText, BarChart3, Store, Truck
-} from 'lucide-react';
-import { UserRole } from '../../utils/supabase/types';
-
-interface MenuItem {
-  label: string;
-  icon: React.ReactNode;
-  path: string;
-  roles: UserRole[];
-}
-
-const menuItems: MenuItem[] = [
-  // Master Admin
-  { label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, path: '/admin/dashboard', roles: ['master_admin'] },
-  { label: 'Network Operators', icon: <Users className="h-5 w-5" />, path: '/admin/operators', roles: ['master_admin'] },
-  { label: 'Franchises', icon: <MapPin className="h-5 w-5" />, path: '/admin/franchises', roles: ['master_admin'] },
-  { label: 'Sellers', icon: <Store className="h-5 w-5" />, path: '/admin/sellers', roles: ['master_admin'] },
-  { label: 'Customers', icon: <Users className="h-5 w-5" />, path: '/admin/customers', roles: ['master_admin'] },
-  { label: 'Analytics', icon: <BarChart3 className="h-5 w-5" />, path: '/admin/analytics', roles: ['master_admin'] },
-  { label: 'Templates', icon: <FileText className="h-5 w-5" />, path: '/admin/templates', roles: ['master_admin'] },
-  { label: 'Settings', icon: <Settings className="h-5 w-5" />, path: '/admin/settings', roles: ['master_admin'] },
-  
-  // Network Operator
-  { label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, path: '/operator/dashboard', roles: ['network_operator'] },
-  { label: 'My Area', icon: <MapPin className="h-5 w-5" />, path: '/operator/area', roles: ['network_operator'] },
-  { label: 'Sellers', icon: <Store className="h-5 w-5" />, path: '/operator/sellers', roles: ['network_operator'] },
-  { label: 'Orders', icon: <ShoppingCart className="h-5 w-5" />, path: '/operator/orders', roles: ['network_operator'] },
-  { label: 'Customers', icon: <Users className="h-5 w-5" />, path: '/operator/customers', roles: ['network_operator'] },
-  { label: 'Reports', icon: <BarChart3 className="h-5 w-5" />, path: '/operator/reports', roles: ['network_operator'] },
-  { label: 'Support', icon: <Bell className="h-5 w-5" />, path: '/operator/support', roles: ['network_operator'] },
-  
-  // Seller
-  { label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, path: '/seller/dashboard', roles: ['manufacturer', 'distributor', 'trader', 'retailer'] },
-  { label: 'Products', icon: <Package className="h-5 w-5" />, path: '/seller/products', roles: ['manufacturer', 'distributor', 'trader', 'retailer'] },
-  { label: 'Orders', icon: <ShoppingCart className="h-5 w-5" />, path: '/seller/orders', roles: ['manufacturer', 'distributor', 'trader', 'retailer'] },
-  { label: 'Inventory', icon: <Truck className="h-5 w-5" />, path: '/seller/inventory', roles: ['manufacturer', 'distributor', 'trader', 'retailer'] },
-  { label: 'Analytics', icon: <BarChart3 className="h-5 w-5" />, path: '/seller/analytics', roles: ['manufacturer', 'distributor', 'trader', 'retailer'] },
-  { label: 'Profile', icon: <User className="h-5 w-5" />, path: '/seller/profile', roles: ['manufacturer', 'distributor', 'trader', 'retailer'] },
-  
-  // Customer
-  { label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, path: '/customer/dashboard', roles: ['customer'] },
-  { label: 'Browse Products', icon: <ShoppingBag className="h-5 w-5" />, path: '/customer/products', roles: ['customer'] },
-  { label: 'Cart', icon: <ShoppingCart className="h-5 w-5" />, path: '/customer/cart', roles: ['customer'] },
-  { label: 'Orders', icon: <Package className="h-5 w-5" />, path: '/customer/orders', roles: ['customer'] },
-  { label: 'Wishlist', icon: <Bell className="h-5 w-5" />, path: '/customer/wishlist', roles: ['customer'] },
-  { label: 'Profile', icon: <User className="h-5 w-5" />, path: '/customer/profile', roles: ['customer'] },
-  { label: 'Addresses', icon: <MapPin className="h-5 w-5" />, path: '/customer/addresses', roles: ['customer'] },
-  { label: 'Support', icon: <Bell className="h-5 w-5" />, path: '/customer/support', roles: ['customer'] },
-];
+import { RoleSwitcher } from '../shared/RoleSwitcher';
+import { Avatar, AvatarFallback } from '../ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { Home, Settings, LogOut, User, Bell, Menu, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  if (!user) return null;
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  const filteredMenuItems = menuItems.filter(item => 
-    user && item.roles.includes(user.role)
-  );
+  const currentRole = user.currentRole || user.primaryRole;
+  const dashboardPath = `/${currentRole.replace('_', '-')}/dashboard`;
 
-  const getRoleName = (role: UserRole) => {
-    const roleNames: Record<UserRole, string> = {
-      master_admin: 'Master Admin',
-      network_operator: 'Network Operator',
-      manufacturer: 'Manufacturer',
-      distributor: 'Distributor',
-      trader: 'Trader',
-      retailer: 'Retailer',
-      customer: 'Customer',
-    };
-    return roleNames[role] || role;
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-40">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
-            >
-              {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="h-6 w-6 text-blue-600" />
-              <span className="text-lg">ValueFind Pro</span>
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div className="flex items-center gap-4">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild className="lg:hidden">
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64">
+                  <nav className="flex flex-col gap-2 mt-6">
+                    <Link to={dashboardPath} onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start">
+                        <Home className="mr-2 h-4 w-4" /> Dashboard
+                      </Button>
+                    </Link>
+                  </nav>
+                </SheetContent>
+              </Sheet>
+              <Link to={dashboardPath} className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1.5 rounded-lg font-bold">
+                  VF
+                </div>
+                <span className="font-semibold text-lg hidden sm:inline">ValueFind Pro</span>
+              </Link>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="hidden md:block text-right">
-              <div className="text-sm text-gray-900">{user?.name}</div>
-              <div className="text-xs text-gray-500">{user && getRoleName(user.role)}</div>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden lg:flex items-center gap-2">
+              <Link to={dashboardPath}>
+                <Button variant="ghost" size="sm">
+                  <Home className="mr-2 h-4 w-4" /> Dashboard
+                </Button>
+              </Link>
+            </nav>
+
+            {/* Right Section */}
+            <div className="flex items-center gap-3">
+              {/* Role Switcher */}
+              <RoleSwitcher />
+
+              {/* Notifications */}
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </Button>
+
+              {/* User Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="gap-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="hidden sm:inline">{user.name}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-xs text-gray-500">{user.email}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate(`/${currentRole.replace('_', '-')}/profile`)}>
+                    <User className="mr-2 h-4 w-4" /> Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(`/${currentRole.replace('_', '-')}/settings`)}>
+                    <Settings className="mr-2 h-4 w-4" /> Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" /> Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
           </div>
         </div>
       </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className={`
-          fixed lg:sticky top-[57px] left-0 z-30 h-[calc(100vh-57px)]
-          w-64 bg-white border-r transform transition-transform duration-200 ease-in-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}>
-          <nav className="p-4 space-y-1 overflow-y-auto h-full">
-            {filteredMenuItems.map((item, index) => (
-              <Link
-                key={index}
-                to={item.path}
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
-                  ${location.pathname === item.path 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                  }
-                `}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-        </aside>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6">
+        {children}
+      </main>
 
-        {/* Main Content */}
-        <main className="flex-1 p-6 lg:p-8 overflow-auto">
-          {children}
-        </main>
-      </div>
-
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 mt-12">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-gray-600">
+              © 2025 ValueFind Pro. All rights reserved.
+            </p>
+            <div className="flex gap-4">
+              <Link to="/terms" className="text-sm text-gray-600 hover:text-gray-900">Terms</Link>
+              <Link to="/privacy" className="text-sm text-gray-600 hover:text-gray-900">Privacy</Link>
+              <Link to="/support" className="text-sm text-gray-600 hover:text-gray-900">Support</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
