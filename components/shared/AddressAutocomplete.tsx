@@ -37,7 +37,7 @@ export const AddressAutocomplete: React.FC<Props> = ({
   validateServiceArea = false,
   serviceAreaPincodes = [],
 }) => {
-  const { autocomplete, getPlaceDetails, geocodeAddress, isConfigured } = useMaps();
+  const { autocomplete, getPlaceDetails, geocodeAddress, reverseGeocode, isConfigured } = useMaps();
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -133,7 +133,7 @@ export const AddressAutocomplete: React.FC<Props> = ({
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        const result = await useMaps().reverseGeocode(latitude, longitude);
+        const result = await reverseGeocode(latitude, longitude);
         if (result) {
           onChange({
             line1: result.formattedAddress || '',
