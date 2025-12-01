@@ -8,12 +8,12 @@ import { LandingPage } from './components/public/LandingPage';
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
-import { MasterAdminDashboard } from './components/dashboards/MasterAdminDashboard';
-import { NetworkOperatorDashboard } from './components/dashboards/NetworkOperatorDashboard';
-import { StoreOwnerDashboard } from './components/dashboards/StoreOwnerDashboard';
-import { DeliveryPartnerDashboard } from './components/dashboards/DeliveryPartnerDashboard';
-import { CustomerDashboard } from './components/dashboards/CustomerDashboard';
-import { ProtectedRoute } from './components/shared/ProtectedRoute';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { AdminSettings } from './components/admin/settings/AdminSettings';
+import { OperatorDashboard } from './components/operator/OperatorDashboard';
+import { SellerDashboard } from './components/seller/SellerDashboard';
+import { CustomerDashboard } from './components/customer/CustomerDashboard';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import './styles/globals.css';
 
@@ -31,7 +31,23 @@ const AppRoutes: React.FC = () => {
         path="/master-admin/dashboard"
         element={
           <ProtectedRoute allowedRoles={['master_admin']}>
-            <MasterAdminDashboard />
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/master-admin/settings"
+        element={
+          <ProtectedRoute allowedRoles={['master_admin']}>
+            <AdminSettings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings"
+        element={
+          <ProtectedRoute allowedRoles={['master_admin']}>
+            <AdminSettings />
           </ProtectedRoute>
         }
       />
@@ -41,7 +57,7 @@ const AppRoutes: React.FC = () => {
         path="/network-operator/dashboard"
         element={
           <ProtectedRoute allowedRoles={['network_operator']}>
-            <NetworkOperatorDashboard />
+            <OperatorDashboard />
           </ProtectedRoute>
         }
       />
@@ -51,7 +67,7 @@ const AppRoutes: React.FC = () => {
         path="/store-owner/dashboard"
         element={
           <ProtectedRoute allowedRoles={['store_owner']}>
-            <StoreOwnerDashboard />
+            <SellerDashboard />
           </ProtectedRoute>
         }
       />
@@ -61,7 +77,7 @@ const AppRoutes: React.FC = () => {
         path="/delivery-partner/dashboard"
         element={
           <ProtectedRoute allowedRoles={['delivery_partner']}>
-            <DeliveryPartnerDashboard />
+            <CustomerDashboard />
           </ProtectedRoute>
         }
       />
